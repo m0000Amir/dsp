@@ -1,54 +1,101 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+import time
 
-def orthogonal_matching_pursuit(A, b, sparsity):
-    """ Orthogonal Matching Pursuit (OMP) for complex-valued data. """
-    m, n = A.shape
-    residual = b.copy()
-    support = []
-    x = np.zeros(n, dtype=np.complex128)
-    
-    for _ in range(sparsity):
-        correlations = A.conj().T @ residual  # Compute correlations
-        idx = np.argmax(np.abs(correlations))  # Find the index of the max correlation
-        support.append(idx)
-        
-        A_restricted = A[:, support]  # Restricted dictionary
-        x_restricted = np.linalg.lstsq(A_restricted, b, rcond=None)[0]  # Solve least squares
-        
-        residual = b - A_restricted @ x_restricted  # Update residual
-    
-    x[support] = x_restricted  # Assign values to x
-    return x
 
-def sequential_pursuit(A, b, sparsity):
-    """ Sequential Pursuit (SP) for complex-valued data. """
-    m, n = A.shape
-    residual = b.copy()
-    support = []
-    x = np.zeros(n, dtype=np.complex128)
-    
-    for _ in range(sparsity):
-        correlations = A.conj().T @ residual  # Compute correlations
-        idx = np.argmax(np.abs(correlations))  # Find the index of the max correlation
-        support.append(idx)
-        x_subset = np.zeros(n, dtype=np.complex128)
-        x_subset[support] = np.linalg.pinv(A[:, support]) @ b  # Compute solution using pseudo-inverse
-        residual = b - A @ x_subset  # Update residual
-    
-    x = x_subset  # Assign values to x
-    return x
+from sparse_approximation.omp import orthogonal_matching_pursuit
+from sparse_approximation.subspace_p import subspace_pursuit
+from sparse_approximation.sequential_p import sequential_pursuit
+
 
 if __name__ == "__main__":
-    # Example usage:
-    m, n, sparsity = 20, 40, 5
-    A = np.random.randn(m, n) + 1j * np.random.randn(m, n)  # Complex dictionary matrix
+    np.random.seed(42)
+
+    # Parameters
+    # m, n = 50, 100  # A is m x n
+    # num_groups = 10
+    # group_size = n // num_groups
+    # sparsity = 3  # Number of nonzero groups
+
+    m = 146_100
+    num_groups = 81
+    group_size = 17
+    n = num_groups * group_size
+    sparsity = 18  # Number of nonzero groups
+
+    # Generate random dictionary A
+    A = np.random.randn(m, n) + 1j * np.random.randn(m, n)
+
+    # Generate sparse ground truth x
     x_true = np.zeros(n, dtype=np.complex128)
-    nonzero_indices = np.random.choice(n, sparsity, replace=False)
-    x_true[nonzero_indices] = np.random.randn(sparsity) + 1j * np.random.randn(sparsity)
-    b = A @ x_true  # Generate measurements
+    selected_groups = np.random.choice(num_groups, sparsity, replace=False)
 
-    x_omp = orthogonal_matching_pursuit(A, b, sparsity)
-    x_sp = sequential_pursuit(A, b, sparsity)
+    for g in selected_groups:
+        indices = range(g * group_size, min((g + 1) * group_size, n))
+        x_true[list(indices)] = (
+            np.random.randn(len(indices)) +
+            1j * np.random.randn(len(indices))
+        )
 
-    print("OMP Solution:", x_omp)
-    print("SP Solution:", x_sp)
+    # Generate noisy measurements
+    y = A @ x_true + 0.01 * np.random.randn(m)  # Add small noise
+
+    # START
+    start_time = time.time()
+    # Apply OMP
+    x_omp, support_omp = orthogonal_matching_pursuit(A, y, num_groups,
+                                                     group_size, sparsity)
+    omp_time = time.time()
+
+    # Apply SP
+    x_sp, support_sp = subspace_pursuit(A, y, num_groups, group_size, sparsity)
+    subp_time = time.time()
+
+    # Apply Sequential Pursuit
+    x_seq, support_seq = sequential_pursuit(A, y, num_groups, group_size,
+                                            sparsity)
+    seqp_time = time.time()
+
+    finish_time = time.time()
+    print("Finish time in seconds:", finish_time - start_time)
+    # Compare results
+    print("\n=== COMPARISON ===")
+
+    print(f"True Support Groups: {sorted(selected_groups)}")
+    omp_total = omp_time - start_time
+    print(f"    Orthogonal Matching Pursuit time in seconds:{omp_total} sec")
+    omp_groups = sorted(set(s // group_size for s in support_omp))
+    print(f"Orthogonal Matching Pursuit Recovered Groups: {omp_groups}")
+
+    subp_total = subp_time - omp_time
+    print(f"Subspace Pursuit time in seconds:{subp_total} sec")
+    subp_groups = sorted(set(s // group_size for s in support_sp))
+    print(f"Subspace Pursuit Recovered Groups: {subp_groups}")
+
+    seqp_total = seqp_time - subp_time
+    print(f"    Sequential Pursuit time in seconds:{seqp_total} sec")
+    seqp_groups = sorted(set(s // group_size for s in support_seq))
+    print(f"Sequential Pursuit Recovered Indices: {seqp_groups}")
+
+    # Plot results
+    plt.figure(figsize=(10, 4))
+
+    plt.subplot(1, 4, 1)
+    plt.stem(np.abs(x_true))
+    plt.title("True Sparse Signal")
+
+    plt.subplot(1, 4, 2)
+    plt.stem(np.abs(x_omp))
+    plt.title("OMP")
+
+    plt.subplot(1, 4, 3)
+    plt.stem(np.abs(x_sp))
+    plt.title("Sparse Pursuit")
+
+    plt.subplot(1, 4, 4)
+    plt.stem(np.abs(x_seq))
+    plt.title("Sequential Pursuit")
+
+    plt.tight_layout()
+    plt.show()
