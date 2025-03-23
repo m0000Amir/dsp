@@ -46,6 +46,11 @@ Due to their nonlinear nature, PAs introduce distortions in transmitted signals,
 
 ### Linearization
 
+![psd_dpd](./figures/psd_dpd.png)
+Linearization performance of the PA at a 100-MHz LTE signal.
+
+*X. Hu et al., "Convolutional Neural Network for Behavioral Modeling and Predistortion of Wideband Power Amplifiers," in IEEE Transactions on Neural Networks and Learning Systems, vol. 33, no. 8, pp. 3923-3937, Aug. 2022, doi: 10.1109/TNNLS.2021.3054867.*
+
 ![dpd_pa](./figures/dpd_pa.jpg)
 
 Block diagram of a DPD system shows how it linearizes the PA.
@@ -219,7 +224,7 @@ DLA updates the pre-distortion function dynamically by minimizing the error betw
 
 ---
 
-## **5. Conclusion**
+**5. Conclusion**
 
 - **ILA** is simpler but less adaptive since it learns the inverse model offline.
 - **DLA** continuously updates the pre-distortion model, offering better performance in dynamic conditions.
@@ -241,6 +246,8 @@ where:
 - $h_n(\tau_1, \tau_2, ..., \tau_n$) are the Volterra kernels,
 - $x(t)$ is the input signal,
 - $y(t)$ is the output signal.
+
+The **Volterra series** is a generalization of the **Taylor series**, and it is particularly useful in describing nonlinear systems that exhibit memory effects.
 
 ---
 
@@ -295,6 +302,50 @@ where:
 - $x^*(t)$ is the **complex conjugate** $x(t)$,
 - The terms involving $x(t)$ capture **nonlinear distortion** effects in power amplifiers.
 
+## Metrics
+
+### Error Vector Magnitude (EVM) & Adjacent Channel Power Ratio (ACPR)
+
+1. Error Vector Magnitude (EVM)
+EVM measures the difference between the ideal transmitted signal and the actual received signal in communication systems. It is commonly used to evaluate modulation quality.
+
+**EVM Formula**  
+$$
+EVM_{\text{rms}} (\%) = \frac{\sqrt{\frac{1}{N} \sum_{i=1}^{N} |E_i|^2}}{\sqrt{\frac{1}{N} \sum_{i=1}^{N} |S_i|^2}} \times 100
+$$
+
+where:
+
+- $E_i = S_i - R_i$ (Error vector: difference between ideal signal $S_i$ and received signal $R_i$)
+- $S_i$ = Ideal transmitted signal
+- $R_i$ = Actual received signal
+- $N$ = Number of measured symbols
+
+**Interpretation:**
+
+- **Lower EVM (%)** → Better signal quality.
+- **Higher EVM (%)** → More distortion, poor transmission quality.
+
+---
+
+1. Adjacent Channel Power Ratio (ACPR)
+ACPR measures how much power leaks into adjacent frequency channels, affecting spectral efficiency and interference.
+
+**ACPR Formula**  
+$$
+ACPR = 10 \log_{10} \left(\frac{P_{\text{adjacent}}}{P_{\text{main}}} \right) \quad \text{(in dB)}
+$$
+
+where:
+
+- $P_{\text{adjacent}}$ = Power in the adjacent channel
+- $P_{\text{main}}$ = Power in the main channel
+
+**Interpretation:**
+
+- **Lower ACPR (more negative dB)** → Less interference with adjacent channels.
+- **Higher ACPR (closer to 0 dB or positive values)** → More interference, poor spectral efficiency.
+
 ## AI Wi-Fi
 
 ![image info](./figures/Qualcomm_FastConnect.png)
@@ -302,6 +353,18 @@ The Qualcomm FastConnect 7900 Mobile Connectivity System is an AI-enhanced conne
 
 <https://www.qualcomm.com/news/releases/2024/02/qualcomm-redefines-connected-experiences-with-fastconnect-7900--/>
 
+---
+
 ## AI DPD model
 
 AI DPD
+
+### Real-valued time-delay convolutional NN (RVTDCNN)
+
+![rvtdcnn_model](./figures/rvtdcnn_model.png)
+
+RVTDCNN model
+
+The trained convolutional layer is used as a predesigned filter to extract the features of the input data. Due to the extraction effect of the predesigned filter on the basis function, only a simple, FC layer can be used to track the behavioral characteristics of the PA. Therefore, when the parameters of the predesigned filter are trained, only the parameters θ f k = {ωf k ,b f k ,ωo k ,bo k } of the FC layer and the output layer need to be adjusted with the Levenberg–Marquardt (LM) algorithm [46]. The training process of the RVTDCNN model is shown in Algorithm 1.
+
+*X. Hu et al., "Convolutional Neural Network for Behavioral Modeling and Predistortion of Wideband Power Amplifiers," in IEEE Transactions on Neural Networks and Learning Systems, vol. 33, no. 8, pp. 3923-3937, Aug. 2022, doi: 10.1109/TNNLS.2021.3054867.*
